@@ -1,4 +1,4 @@
-# SENSI-EEG-Preproc-CS
+# SENSI-EEG-Preproc-CS: A MATLAB Preprocessing Pipeline for EEG Responses to Continuous Stimuli
 SENSI-EEG-Preproc-CS is a preprocessing pipeline, written in MATLAB, to handle electroencephalography (EEG) responses to continuous stimuli. The pipeline comprises five main steps: (1) Data loading, filtering, and epoching; (2) specification of bad channels and electrooculogram (EOG) channels; (3) Independent Components Analysis (ICA); (4) identification of artifactual Independent Components and final data-rejection, imputation, and referencing; and (5) aggregation of cleaned data records on a per-stimulus basis. The codebase is self-contained, and code files contain documentation throughout. Future releases may include a User Manual and structured illustrative analyses.
 
 ## Information about the pipeline
