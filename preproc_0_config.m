@@ -68,7 +68,7 @@ assert(~isempty(which('saveCurrentFigure')), ...
 INFO.codeDir = '';
 
 % Directory containing the config file
-INFO.configDir = 'INFO.codeDir';
+INFO.configDir = INFO.codeDir;
 
 % Config file filename
 INFO.configFn = 'preproc_0_config.m';
