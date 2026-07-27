@@ -387,7 +387,6 @@ for i = 1:nFilesMatRaw
         sgtitle({thatFnOut,""},'interpreter', 'none') % Title is 2 lines to avoid overlap
         thatFnSize = [10 20];
         saveCurrentFigure(INFO.preprocFigDir, thatFnOut, thatFnSize);
-        img1 = imread(thatFnOut);
         clear that*
         
       %%%%%%%%%%%%%%%%%%%%%%%%%%  Optional %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
