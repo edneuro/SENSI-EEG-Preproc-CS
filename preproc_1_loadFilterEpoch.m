@@ -714,7 +714,7 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%% Variables to clear %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-clear ans fNamesMatRaw i j nFilesMatRaw saveFigs saveLog STIMINFO fH tH tfH
+clear ans fNamesMatRaw i j nFilesMatRaw saveFigs saveLog STIMINFO fH tH tfH drifts_din
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
