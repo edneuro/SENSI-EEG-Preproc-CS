@@ -151,6 +151,7 @@ ALLSTIMS = [ ];
 % Variables for NaN Gaps Fix
 allNanGaps = {};
 allNanGapsID = 0;
+DROPPED = struct('fName', {}, 'trigger', {}, 'trial', {}, 'errMsg', {}, 'errWhere', {});
 
 % Clear important variables
 clear data* subID* behav*
@@ -215,6 +216,28 @@ for f = 1:nFiles
                 ', time samples ' num2str(thatStartSamp) ' to ' num2str(thatEndSamp) ...
                 ', trigger+behav: ' mat2str(thatBehav)])
 
+            % ================ Gap Fix Section =================
+            % If the gap fix fails, the trial is dropped and recorded in
+            % DROPPED instead of stopping the run. This runs before the
+            % data### variables are initiated, so a trigger whose trials
+            % were all dropped is not saved as an empty file.
+            try
+                [xGapsFix, nanGaps] = ...
+                    temporalNaNCorrectDamped(THIS.X(:, thatStartSamp:thatEndSamp), THIS.fs, t);
+            catch thatErr
+                DROPPED(end+1) = struct('fName', fNames{f}, 'trigger', thatTrigger, ...
+                    'trial', t, 'errMsg', thatErr.message, ...
+                    'errWhere', sprintf('%s, line %d', thatErr.stack(1).name, thatErr.stack(1).line)); %#ok<SAGROW>
+                disp(['[DROPPED] ' fNames{f} ', trigger ' num2str(thatTrigger) ', trial ' ...
+                    num2str(t) ': ' thatErr.message ' (' DROPPED(end).errWhere ')'])
+                clear that*
+                continue
+            end
+
+            allNanGapsID = allNanGapsID + 1;
+            allNanGaps{allNanGapsID} = nanGaps;
+            % ==================================================
+
             % If variable 'data###' for trigger### doesn't exist, initiate
             % the variables for this trigger
             if ~exist(['data' num2str(thatTrigger)], 'var')
@@ -224,14 +247,6 @@ for f = 1:nFiles
                 ALLSTIMS(end+1) = thatTrigger;
             end
             % eval(['size(data' num2str(thatTrigger) ')']) % DEBUG
-            
-            % ================ Gap Fix Section =================
-            [xGapsFix, nanGaps] = ...
-                temporalNaNCorrectDamped(THIS.X(:, thatStartSamp:thatEndSamp), THIS.fs, t);
-            
-            allNanGapsID = allNanGapsID + 1;
-            allNanGaps{allNanGapsID} = nanGaps;
-            % ==================================================
 
             
             % eval(['size(data' num2str(thatTrigger) ')']) % DEBUG
@@ -267,7 +282,8 @@ end
 tmp  = cellfun(@(x) x(:), allNanGaps, 'UniformOutput', false);  % each cell -> column vector
 allGapMsFlat = vertcat(tmp{:});
 
-figHist = plotNanGaps(allGapMsFlat);
+[figHist, figDrop] = plotNanGaps(allGapMsFlat, DROPPED);
+INFO.preproc5_droppedTrials = DROPPED;
 % ==========================================================
 
 
