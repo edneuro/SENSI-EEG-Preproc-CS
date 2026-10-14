@@ -151,8 +151,6 @@ ALLSTIMS = [ ];
 % Variables for NaN Gaps Fix
 allNanGaps = {};
 allNanGapsID = 0;
-longGapTable = table();
-allnanPlotData = {};
 
 % Clear important variables
 clear data* subID* behav*
@@ -228,14 +226,11 @@ for f = 1:nFiles
             % eval(['size(data' num2str(thatTrigger) ')']) % DEBUG
             
             % ================ Gap Fix Section =================
-            [xGapsFix, nanGaps, GapTable, nanPlotData] = ...
-                temporalNaNCorrect(THIS.X(:, thatStartSamp:thatEndSamp), THIS.fs, f, t);
+            [xGapsFix, nanGaps] = ...
+                temporalNaNCorrectDamped(THIS.X(:, thatStartSamp:thatEndSamp), THIS.fs, t);
             
             allNanGapsID = allNanGapsID + 1;
             allNanGaps{allNanGapsID} = nanGaps;
-
-            longGapTable = [longGapTable; GapTable];
-            allnanPlotData = [allnanPlotData; nanPlotData];
             % ==================================================
 
             
@@ -273,12 +268,6 @@ tmp  = cellfun(@(x) x(:), allNanGaps, 'UniformOutput', false);  % each cell -> c
 allGapMsFlat = vertcat(tmp{:});
 
 figHist = plotNanGaps(allGapMsFlat);
-
-if exist('longGapTable','var') && exist('allnanPlotData','var')
-    if ismember('z', longGapTable.Properties.VariableNames)
-        figSus = plotTopSuspicious(longGapTable, allnanPlotData, 4);
-    end
-end
 % ==========================================================
 
 

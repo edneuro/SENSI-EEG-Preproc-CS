@@ -266,8 +266,9 @@ disp([newline '\ * \ Code section complete (rendered temporary figure[s]) / * /'
 % 4 - Review the figures and make your final decisions for each component.
 
 % INTERACTION (DIN UI and EKG UI):
-% 5 - The UIs display suspected components. Sources start as flagged for 
-%     REJECT (red).
+% 5 - The UIs display suspected components. Sources that pass the 
+%     detector's flag rule start as flagged for REJECT (red); the other 
+%     suspected sources start as KEEP (green).
 % 6 - To KEEP a source (i.e., you do not believe it is an artifact): Click 
 %     anywhere on its row (topography, time series, or frequency plot). The 
 %     row will toggle to green.
@@ -282,30 +283,29 @@ disp([newline '\ * \ Code section complete (rendered temporary figure[s]) / * /'
 
 % [OPTIONAL] Adjusting the Time Window:
 % 9 - The time-domain plots show a 10-second segment starting at 
-%     `tempStartSec` (default 5 minutes, or 5*60 seconds). In rare cases 
-%     where an artifact is ambiguous (e.g., EKG-like), you may visualize a 
-%     different segment of data by adjusting the value of `tempStartSec` in 
-%     the preliminary variables section. Be sure any value you enter does 
-%     not exceed the total length of the data. NOTE: In most cases, you 
-%     should NOT need to adjust this parameter. Please do not spot-check 
-%     different data segments by default.
+%     `tempStart`: 'strongest' (default; each component at its own 
+%     strongest stretch of the recording) or a start time in seconds, the 
+%     same for every row. It can also be changed in the figure ('Window 
+%     start' box). Be sure any value you enter does not exceed the total 
+%     length of the data. NOTE: In most cases, you should NOT need to adjust 
+%     this parameter. Please do not spot-check different data segments by default.
 
 % %%%%%%%%%%%%%%%%%% Preliminary Variables %%%%%%%%%%%%%%%%%%%%%
 
 tempNSources = 1:size(xRaw,1); % Assess all available ICA components
 % tempNSources = [1:30]; % Or, specify a subset of ICA Sources to Check
 
-tempStartSec = 5*60; % Start time for temporal plot (seconds). Adjust per instruction #9.
+tempStart = 'strongest'; % Start of the temporal plot. Adjust per instruction #9.
 tempNSec = 10; % Duration of temporal plot in seconds.
 
 %%%%%%%%%%%%%%%%%%%%%% DIN Detection %%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Detect DIN ICA components via harmRatioFromSignal
-[dinSrc, tempDinInfo] = autoDetectDIN(xICA, fs, tempNSources, INFO.PostICA.dinOpts);
+% Detect DIN ICA components via the comb score (dinCombScore)
+[dinSrc, tempDinCand, tempDinInfo] = autoDetectDINV2(xICA, fs, tempNSources, INFO.PostICA.dinOpts);
 
 % Interactive review of DIN candidates
-dinSrc = reviewDINArtifactUI(W, xICA, fs, chanlocs, dinSrc, tempDinInfo.reviewCandidates, ...
-   tempStartSec, tempNSec, [INFO.preproc4_MIR_fNameLoaded(1:end-4) '_05d_' 'DIN'], ...
+dinSrc = reviewDINArtifactUIV2(W, xICA, fs, chanlocs, dinSrc, tempDinCand, tempDinInfo, ...
+   tempStart, tempNSec, [INFO.preproc4_MIR_fNameLoaded(1:end-4) '_05d_' 'DIN'], ...
    saveFigs, INFO.preprocFigDir);
 
 if isempty(dinSrc); fprintf('\n\tNo DIN artifact detected\n')
@@ -313,12 +313,12 @@ else; fprintf('\n\tdinSrc = %s\n', mat2str(dinSrc));
 end
 
 %%%%%%%%%%%%%%%%%%%%%%% EKG Detection %%%%%%%%%%%%%%%%%%%%%%%%%
-% SNR Harmonic Test (detecting beats via spectral analysis)
-[ekgSrc, ekgSus, ~] = autoDetectEkg(xICA, fs, tempNSources, INFO.PostICA.ekgOpts);
+% Harmonic SNR per chunk of time + beat-train regularity (rrReg2Score)
+[ekgSrc, tempEkgCand, tempEkgInfo] = autoDetectEkgV2(xICA, fs, tempNSources, INFO.PostICA.ekgOpts);
 
 % EKG UI - Interactive review of flagged and suspected sources
-ekgSrc = reviewEkgArtifactUI(W, xICA, fs, chanlocs, ekgSrc, ekgSus, ...
-   tempStartSec, tempNSec, [INFO.preproc4_MIR_fNameLoaded(1:end-4) '_05e_' 'EKG'], ...
+ekgSrc = reviewEkgArtifactUIV2(W, xICA, fs, chanlocs, ekgSrc, tempEkgCand, tempEkgInfo, ...
+   tempStart, tempNSec, [INFO.preproc4_MIR_fNameLoaded(1:end-4) '_05e_' 'EKG'], ...
    saveFigs, INFO.preprocFigDir);
 
 if isempty(ekgSrc); fprintf('\n\tNo EKG artifact detected\n')
@@ -338,7 +338,7 @@ tempOtherSrc = setdiff((1:10).',[hiReject(:); lowReject(:); ekgSrc(:); dinSrc(:)
 
 % Use the updated, save-enabled UI for review. Note: This UI starts components 
 % flagged for KEEP (green), as rejection here should be rare.
-otherSrc = reviewOtherUI(W, xICA, fs, chanlocs, otherSrc, tempOtherSrc, ...
+otherSrc = reviewOtherUIV2(W, xICA, fs, chanlocs, otherSrc, tempOtherSrc, ...
     [INFO.preproc4_MIR_fNameLoaded(1:end-4) '_05f_' 'Other'], saveFigs, INFO.preprocFigDir); % Figure 6
 
 clear temp*

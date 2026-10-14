@@ -1,9 +1,13 @@
-function otherSrcFinal = reviewOtherUI(W, xICA, fs, chanlocs, otherInit, candidates, figName, saveFigs, saveFolder)
-% REVIEWOTHERUI  Paged interactive review UI for ICA components not caught
-%                by the automated EKG or DIN detectors.
+function otherSrcFinal = reviewOtherUIV2(W, xICA, fs, chanlocs, otherInit, candidates, figName, saveFigs, saveFolder, icChannels)
+% REVIEWOTHERUIV2  Paged interactive review UI for ICA components not caught
+%                  by the automated EKG or DIN detectors (V2).
 %
-%   OTHERSRCFINAL = REVIEWOTHERUI(W, XICA, FS, CHANLOCS, OTHERINIT,
-%                    CANDIDATES, FIGNAME, SAVEFIGS, SAVEFOLDER)
+%   OTHERSRCFINAL = REVIEWOTHERUIV2(W, XICA, FS, CHANLOCS, OTHERINIT,
+%                    CANDIDATES, FIGNAME, SAVEFIGS, SAVEFOLDER, ICCHANNELS)
+%
+%   reviewOtherUI (V1) with two changes: on Done only the pages that hold at
+%   least one component flagged for REJECT (red) are saved, and the optional
+%   IC power-per-channel window (showICChannelsV2) opens beside the review.
 %
 %   Opens a paged MATLAB figure (up to pageCap=4 rows per page) where each
 %   row shows a topoplot and the full-length IC time series. Components in
@@ -19,8 +23,10 @@ function otherSrcFinal = reviewOtherUI(W, xICA, fs, chanlocs, otherInit, candida
 %     otherInit   Vector of component indices pre-flagged for REJECT (red)
 %     candidates  Vector of component indices to review (green)
 %     figName     String used as figure title and output filename base
-%     saveFigs    (Optional) 1 = save all pages on Done, 0 = no save (default 0)
+%     saveFigs    (Optional) 1 = on Done, save the pages that hold a flagged
+%                 (red) component, 0 = no save (default 0)
 %     saveFolder  (Optional) Output folder for saved figures (default: pwd)
+%     icChannels  (Optional) true (default) = open the IC power-per-channel window
 %
 %   OUTPUTS
 %     otherSrcFinal  Row vector of component indices confirmed for rejection
@@ -28,7 +34,8 @@ function otherSrcFinal = reviewOtherUI(W, xICA, fs, chanlocs, otherInit, candida
 %   NOTES
 %     • Pages are navigated with Back/Next buttons; up to pageCap (=4) rows
 %       are shown per page.
-%     • All pages are saved as separate PNGs when saveFigs=1 and Done is clicked.
+%     • When saveFigs=1 and Done is clicked, each page that holds a flagged
+%       (red) component is saved as a separate PNG; pages with none are not.
 %     • Unlike the EKG/DIN UIs, components here start as KEEP (green) by
 %       default since rejection of non-EKG/DIN components should be rare.
 
@@ -70,6 +77,7 @@ if nargin < 8 || isempty(saveFigs),   saveFigs = 0; end
 if nargin < 7 || isempty(figName),    figName = 'Review OTHER Sources (fixed)'; end
 if nargin < 6 || isempty(candidates), candidates = []; end
 if nargin < 5 || isempty(otherInit),  otherInit  = []; end
+if nargin < 10 || isempty(icChannels), icChannels = true; end
 
 Wi = inv(W);
 
@@ -78,6 +86,12 @@ allList = unique([otherInit(:); candidates(:)].','stable');
 if isempty(allList)
     otherSrcFinal = [];
     return;
+end
+
+% V2: the IC power-per-channel window, beside the review; closed when it returns
+if icChannels
+    [~, icFig] = showICChannelsV2(W, xICA, fs, chanlocs, allList, struct('label', 'Other'));
+    closeIC = onCleanup(@() closeIfOpen(icFig)); %#ok<NASGU>   % also on an error or Ctrl+C
 end
 
 % Initial states: otherInit = reject (red), candidates = keep (green)
@@ -224,9 +238,9 @@ return;
         uiresume(fig);
     end
     
-    % *** NEW function to iterate and save all pages ***
+    % *** NEW function to iterate and save the pages with a flagged component ***
     function saveAllPages(figh, folder, name)
-        % Save all pages by iterating through them and redrawing
+        % Save the flagged pages by iterating through them and redrawing
         
         % Ensure folder exists
         if ~isfolder(folder), mkdir(folder); end
@@ -234,7 +248,13 @@ return;
         % Save current page index
         originalPage = curPage;
         
+        nSaved = 0;
         for p = 1:nPages
+            % V2: skip pages with no component flagged for REJECT (red)
+            pageRows = (p-1)*pageCap + 1 : min(p*pageCap, nRowsTotal);
+            if ~any(isOther(pageRows)), continue; end
+            nSaved = nSaved + 1;
+
             % Change page and force redraw
             curPage = p;
             drawPage();
@@ -250,6 +270,10 @@ return;
             catch ME
                 warning('ReviewOTHERUI:SaveError', 'Could not save figure page %d: %s', p, ME.message);
             end
+        end
+        
+        if nSaved == 0
+            fprintf('No component flagged for REJECT: no page saved.\n');
         end
         
         % Restore the original page view
@@ -301,4 +325,8 @@ end
 function out = tern(cond, a, b)
 % TERN  Inline ternary: returns A if COND is true, B otherwise.
     if cond, out = a; else, out = b; end
+end
+
+function closeIfOpen(f)
+if ~isempty(f) && ishghandle(f), delete(f); end
 end

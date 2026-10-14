@@ -254,7 +254,7 @@ INFO.PostICA.ekgOpts.fmax = 2;              % Upper bound of cardiac rhythm band
 INFO.PostICA.ekgOpts.harmonics = 4;         % Number of harmonics to include in spectral test
 % INFO.PostICA.ekgOpts.peakHalfHz  = 0.20;    % half-width of peak window around each harmonic (Hz)
 % INFO.PostICA.ekgOpts.nbHalfHz    = 0.60;    % half-width of neighbor ring around each harmonic (Hz)
-% INFO.PostICA.ekgOpts.time        = 14;      % Welch window length (sec)
+% INFO.PostICA.ekgOpts.window        = 14;      % Welch window length (sec)
 
 %%%%%%%%%%%%%%%%%%%% Voltage magnitude thresholds %%%%%%%%%%%%%%%%%%%%%%%%
 
