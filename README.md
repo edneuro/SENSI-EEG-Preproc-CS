@@ -6,15 +6,21 @@ The SENSI-EEG-Preproc-CS pipeline was created by [Amilcar J. Malave](https://sch
 
 Please contact amilcar.malave1997@gmail.com or blairbo@stanford.edu with any questions or bug reports. 
 
+## Intended usage
+
+This pipeline is designed for researchers collecting EEG with continuous stimuli paradigms. It emphasizes a semi-automated, human-in-the-loop workflow: automated algorithms surface candidates for review, and the researcher makes final decisions through interactive UIs before data proceed to the next step. Steps 2 and 4 are interactive and need the MATLAB desktop; Steps 1, 3 and 5 can run unattended. 
+
 ## Repository structure
 
-1. **preproc_1_loadFilterEpoch.m** — Loads raw .mat EEG files, applies highpass, notch, and lowpass filtering, extracts triggers and trial onsets, and epochs the data. *Output: MatRawEpoched .mat file.*
-2. **preproc_2_specifyBadChEOG.m** — Runs semi-automated bad-channel detection with an interactive review UI and specifies EOG channels. *Input: MatRawEpoched. Output: MatICAReady .mat file.*
-3. **preproc_3_batchICA.m** — Runs ICA on all MatICAReady files in batch using the bundled `runica.m` function. *Output: W matrix .mat file per recording.*
-4. **preproc_4_postICA.m** — Identifies artifactual ICA components (EOG, EKG, DIN), applies component rejection, data imputation, and re-referencing. *Input: MatICAReady + W files. Output: MatClean .mat file.*
-5. **preproc_5_aggregateData.m** — Aggregates cleaned data across participants on a per-stimulus basis. *Input: MatClean files. Output: one .mat file per stimulus.*
+* **preproc_0_config.m** — Configuration file where users specify directories, filtering parameters, trigger info, and other pipeline settings. Copy it to `preproc_0_config_<initials>.m` (git ignores that pattern).
 
-* **/Utils.** Helper functions and utilities used throughout the pipeline. This folder and its subfolders must be added to the MATLAB path before use.
+1. **preproc_1_loadFilterEpoch.m** — Loads raw .mat EEG files, applies highpass, notch, and lowpass filtering, extracts triggers and trial onsets, and epochs the data. *Output: MatRawEpoched.*
+2. **preproc_2_specifyBadChEOG.m** — Runs semi-automated bad-channel detection with an interactive review UI and specifies EOG channels. *Output: MatICAReady.*
+3. **preproc_3_batchICA.m** — Runs ICA (bundled `runica.m`) on all MatICAReady files in batch. *Output: one unmixing matrix `W` per file.*
+4. **preproc_4_postICA.m** — Identifies artifactual ICA components with interactive review: EOG components (high/low-reject review by correlation with the EOG channels), automated DIN (trigger) and EKG detectors with review UIs, and an "other" artifact review. Then removes the components, rejects bad samples, imputes missing data, and re-references. *Output: MatClean.*
+5. **preproc_5_aggregateData.m** — Aggregates cleaned data across participants on a per-stimulus basis. Long NaN gaps are filled by an autoregressive forecast; a trial that cannot be filled is dropped and reported (`[DROPPED]` in the log, `INFO.preproc5_droppedTrials`). *Output: one .mat file per stimulus.*
+
+* **/Utils.** — Helper functions, EGI montage files and the STIMINFO builder. Add it and all subfolders to the MATLAB path.
 
 ## Dependencies
 
@@ -22,7 +28,25 @@ The software was tested on MATLAB R2024b. The toolbox may work with earlier vers
 
 The software requires two MATLAB toolboxes: the Signal Processing Toolbox and the Statistics and Machine Learning Toolbox.
 
-The `runica.m` function (used in Step 3) is bundled in `Utils/HelperFunctions/` and originates from EEGLAB (Delorme & Makeig, 2004).
+#### Third-party code
+
+> The following bundled files originate from EEGLAB (Delorme & Makeig, 2004) and keep their original GNU General Public License (version 2 or later), as stated in their headers: `Utils/HelperFunctions/runica.m`, `topoplotStandalone.m`, `postICAartifacts/topoplot_new.m`, `postICAartifacts/chanlocsFromFile.m`.
+
+> Delorme, A., & Makeig, S. (2004). EEGLAB: an open source toolbox for analysis of single-trial EEG dynamics including independent component analysis. *Journal of Neuroscience Methods, 134*(1), 9–21.
+
+## Input data
+
+- Raw recordings as MATLAB `.mat` files, one per recording, each containing the EEG matrix (129 rows: 128 electrodes plus the reference), `EEGSamplingRate`, `evt_DIN2` (DIN triggers) and `evt_ECI_TCPIP_55513` (TCP/IP triggers). `Impedances_EEG_0` is optional: if it is absent, impedances are recorded as NaN.
+- Trigger conventions as set in the config (`INFO.trigger.*`): stimulus and response codes parsed from "LNNN" TCP triggers, and DIN triggers marking stimulus onsets.
+- A STIMINFO table describing the stimuli (`Utils/StimInfo/STIMINFO_createStimTableFromXlsx.m`).
+
+#### Net layout
+
+> The step scripts are written for the EGI HydroCel GSN 128-channel net. `Utils/HelperFunctions/EGIMontages/` includes montage and neighbour files for other EGI nets (64, 124–129, 194/195, 212/213 and 256/257 channels; electrode-location files for GSN 124 and 128). Using another net requires changing the channel ranges, EOG channels and reference channel in Steps 2 and 4 to match.
+
+## Outputs and logs
+
+Each step writes a `.mat` file and (when `saveFigs` is on) figures. With `saveLog` on, Steps 1, 4 and 5 also write a console log: `<name>_00_MatRawLog.txt` (Step 1, in `INFO.preprocLogDir`), `<name>_09_FinalStepsLog.txt` (Step 4's final cleaning block, in `INFO.preprocFigDir`) and `AggregateDataLog_<datetime>.txt` (Step 5, in its output folder). The logs hold values that are not saved elsewhere — trigger drift and onset lags, percent of data rejected, and dropped trials — and are meant for the analyst's write-up.
 
 ## Getting started
 
@@ -31,6 +55,11 @@ The `runica.m` function (used in Step 3) is bundled in `Utils/HelperFunctions/` 
 3. Create a personal copy of the config file by copying `preproc_0_config.m` and appending an underscore and your initials to the filename (e.g., `preproc_0_config_AB.m`). Git will ignore any config file with this naming pattern.
 4. Fill in the directory paths and parameters in your personal config file following the instructions at the top of that file.
 5. Run the five preprocessing steps in order, following the instructions at the top of each script file.
+
+## Known limitations
+
+- ICA results are not reproducible run to run: `runica.m` seeds its random number generator from the clock. Re-running Step 3 on a file gives a different `W`, so keep the `W` files that a Step 4 review was done against.
+- Re-running Step 3 recomputes every file, including those that already have a `W`.
 
 ## Citing the pipeline
 If using any materials from this pipeline, please cite it as follows: 
